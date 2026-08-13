@@ -28,10 +28,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            val attributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
+            val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
             val channel = NotificationChannel(channelId, "Buzzer alarms", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Loud alarms when someone presses your buzzer"
                 setSound(alarmSound, attributes)
@@ -42,9 +39,9 @@ class BuzzerMessagingService : FirebaseMessagingService() {
             manager.createNotificationChannel(channel)
         }
 
+        val alarmScreenText = if (command.isNotBlank()) "$name\n\n\u201c$command\u201d" else name
         val intent = Intent(this, AlarmActivity::class.java).apply {
-            putExtra("name", name)
-            putExtra("command", command)
+            putExtra("name", alarmScreenText)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
