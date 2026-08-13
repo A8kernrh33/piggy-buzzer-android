@@ -14,14 +14,15 @@ import com.google.firebase.messaging.RemoteMessage
 class BuzzerMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val name = message.data["name"]?.take(40)?.ifBlank { "Someone" } ?: "Someone"
-        showAlarmNotification(name)
+        val command = message.data["command"]?.take(180)?.trim().orEmpty()
+        showAlarmNotification(name, command)
     }
 
     override fun onNewToken(token: String) {
         getSharedPreferences("buzzer", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
     }
 
-    private fun showAlarmNotification(name: String) {
+    private fun showAlarmNotification(name: String, command: String) {
         val channelId = "buzzer_alarm"
         val manager = getSystemService(NotificationManager::class.java)
 
@@ -43,6 +44,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
 
         val intent = Intent(this, AlarmActivity::class.java).apply {
             putExtra("name", name)
+            putExtra("command", command)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
@@ -50,10 +52,12 @@ class BuzzerMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val content = if (command.isNotBlank()) command else "$name needs your attention"
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("BUZZ!")
-            .setContentText("$name needs your attention")
+            .setContentTitle("SUMMONED BY $name")
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
