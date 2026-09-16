@@ -49,6 +49,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         updateBattery()
         updateCapabilityStatus()
+        val token = getSharedPreferences("buzzer", MODE_PRIVATE).getString("fcm_token", "") ?: ""
+        DeviceStatusReporter.reportAsync(this, token)
     }
 
     private fun updateBattery() {
@@ -82,7 +84,14 @@ class MainActivity : ComponentActivity() {
 
     private fun loadToken() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            tokenView.text = if (task.isSuccessful) task.result else "Could not get token yet. Reopen the app to retry."
+            if (task.isSuccessful) {
+                val token = task.result
+                tokenView.text = token
+                getSharedPreferences("buzzer", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
+                DeviceStatusReporter.reportAsync(this, token)
+            } else {
+                tokenView.text = "Could not get token yet. Reopen the app to retry."
+            }
         }
     }
 
