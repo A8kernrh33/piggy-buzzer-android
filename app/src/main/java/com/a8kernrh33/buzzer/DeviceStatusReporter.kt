@@ -57,17 +57,8 @@ object DeviceStatusReporter {
                     else -> "Offline"
                 }
                 val stat = StatFs(app.filesDir.absolutePath)
-                val totalStorage = stat.totalBytes
-                val freeStorage = stat.availableBytes
                 val activity = app.getSystemService(ActivityManager::class.java)
                 val memory = ActivityManager.MemoryInfo().also { activity?.getMemoryInfo(it) }
-                val totalRam = memory.totalMem
-                val availableRam = memory.availMem
-                val version = try {
-                    val info = app.packageManager.getPackageInfo(app.packageName, 0)
-                    if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toString() else info.versionCode.toString()
-                } catch (_: Exception) { "unknown" }
-
                 val status = JSONObject().apply {
                     put("battery", if (battery >= 0) battery else JSONObject.NULL)
                     put("charging", plugged != 0)
@@ -75,23 +66,18 @@ object DeviceStatusReporter {
                     put("batteryTemperatureC", temperature)
                     put("deviceModel", Build.MANUFACTURER + " " + Build.MODEL)
                     put("androidVersion", Build.VERSION.RELEASE ?: Build.VERSION.SDK_INT.toString())
-                    put("appVersion", version)
+                    put("appVersion", try { val info = app.packageManager.getPackageInfo(app.packageName, 0); if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toString() else info.versionCode.toString() } catch (_: Exception) { "unknown" })
                     put("deviceAdmin", dpm.isAdminActive(admin))
                     put("notificationsEnabled", notifications)
                     put("uptimeSeconds", SystemClock.elapsedRealtime() / 1000L)
                     put("screenInteractive", power?.isInteractive == true)
-                    put("ringerMode", when (audio?.ringerMode) {
-                        AudioManager.RINGER_MODE_SILENT -> "silent"
-                        AudioManager.RINGER_MODE_VIBRATE -> "vibrate"
-                        else -> "normal"
-                    })
+                    put("ringerMode", when (audio?.ringerMode) { AudioManager.RINGER_MODE_SILENT -> "silent"; AudioManager.RINGER_MODE_VIBRATE -> "vibrate"; else -> "normal" })
                     put("networkType", networkType)
-                    put("storageTotalBytes", totalStorage)
-                    put("storageFreeBytes", freeStorage)
-                    put("ramTotalBytes", totalRam)
-                    put("ramAvailableBytes", availableRam)
+                    put("storageTotalBytes", stat.totalBytes)
+                    put("storageFreeBytes", stat.availableBytes)
+                    put("ramTotalBytes", memory.totalMem)
+                    put("ramAvailableBytes", memory.availMem)
                 }
-
                 val body = JSONObject().apply { put("deviceToken", deviceToken); put("status", status) }.toString()
                 val connection = (URL("$SERVER_URL/api/device/status").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
@@ -102,11 +88,14 @@ object DeviceStatusReporter {
                     setRequestProperty("Accept", "application/json")
                 }
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                connection.inputStream.close()
+                val code = connection.responseCode
+                getSharedPreferences(app).edit().putLong("last_telemetry_attempt", System.currentTimeMillis()).putInt("last_telemetry_code", code).apply()
                 connection.disconnect()
-            } catch (_: Exception) {
-                // Telemetry is best-effort; it must never interfere with alarms or commands.
+            } catch (e: Exception) {
+                getSharedPreferences(context.applicationContext).edit().putLong("last_telemetry_attempt", System.currentTimeMillis()).putInt("last_telemetry_code", -1).putString("last_telemetry_error", e.javaClass.simpleName).apply()
             }
         }.start()
     }
+
+    private fun getSharedPreferences(context: Context) = context.getSharedPreferences("buzzer", Context.MODE_PRIVATE)
 }
