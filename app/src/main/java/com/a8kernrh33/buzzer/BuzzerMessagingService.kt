@@ -8,6 +8,10 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -18,43 +22,61 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         val command = data["command"]?.trim()?.lowercase() ?: "summon"
 
         when (command) {
-            "stop_alarm" -> {
-                sendLocalCommand("stop_alarm")
-                return
-            }
-            "vibrate" -> {
-                sendLocalCommand("vibrate", data)
-                return
-            }
-            "stop_vibration" -> {
-                sendLocalCommand("stop_vibration")
-                return
-            }
-            "notification" -> {
-                showCustomNotification(
-                    data["title"]?.take(80) ?: "BUZZER 2.0",
-                    data["message"]?.take(500) ?: "You have a new summon."
-                )
-                return
-            }
-            "wake" -> {
-                sendLocalCommand("wake")
-                return
+            "stop_alarm" -> stopAlarm()
+            "vibrate" -> vibrate(data["vibration_pattern"])
+            "stop_vibration" -> getVibrator().cancel()
+            "notification" -> showCustomNotification(
+                data["title"]?.take(80) ?: "BUZZER 2.0",
+                data["message"]?.take(500) ?: "You have a new summon."
+            )
+            "wake" -> wakeScreen()
+            else -> {
+                val name = data["name"]?.take(40)?.ifBlank { "Someone" } ?: "Someone"
+                val text = data["message"]?.take(300)?.trim().orEmpty()
+                val duration = data["duration"]?.toLongOrNull()?.coerceIn(1, 300) ?: 60L
+                val volume = data["volume"]?.toIntOrNull()?.coerceIn(0, 100) ?: 100
+                val pattern = data["vibration_pattern"]?.let { parsePattern(it) }
+                showAlarmNotification(name, text, duration, volume, pattern)
             }
         }
-
-        val name = data["name"]?.take(40)?.ifBlank { "Someone" } ?: "Someone"
-        val text = data["message"]?.take(300)?.trim()
-            ?: data["command_text"]?.take(300)?.trim().orEmpty()
-        val duration = data["duration"]?.toLongOrNull()?.coerceIn(1, 300) ?: 60L
-        val volume = data["volume"]?.toIntOrNull()?.coerceIn(0, 100) ?: 100
-        val pattern = data["vibration_pattern"]?.let { parsePattern(it) }
-
-        showAlarmNotification(name, text, duration, volume, pattern)
     }
 
     override fun onNewToken(token: String) {
         getSharedPreferences("buzzer", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
+    }
+
+    private fun getVibrator(): Vibrator = if (Build.VERSION.SDK_INT >= 31) {
+        getSystemService(VibratorManager::class.java).defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    }
+
+    private fun vibrate(raw: String?) {
+        val pattern = raw?.let { parsePattern(it) } ?: longArrayOf(0, 600, 250, 600, 250, 1000)
+        val vibrator = getVibrator()
+        if (Build.VERSION.SDK_INT >= 26) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, 0)
+        }
+    }
+
+    private fun stopAlarm() {
+        getVibrator().cancel()
+        getSystemService(NotificationManager::class.java).cancel(9001)
+        sendBroadcast(Intent("com.a8kernrh33.buzzer.STOP_ALARM"))
+    }
+
+    private fun wakeScreen() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        @Suppress("DEPRECATION")
+        val wakeLock = pm.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "PiggyBuzzer:RemoteWake"
+        )
+        wakeLock.acquire(5000L)
     }
 
     private fun showAlarmNotification(
@@ -92,9 +114,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
-            this,
-            System.currentTimeMillis().toInt(),
-            intent,
+            this, System.currentTimeMillis().toInt(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -119,8 +139,9 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         val channelId = "buzzer_control"
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "Buzzer controls", NotificationManager.IMPORTANCE_HIGH)
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Buzzer controls", NotificationManager.IMPORTANCE_HIGH)
+            )
         }
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -131,16 +152,6 @@ class BuzzerMessagingService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .build()
         manager.notify(9002, notification)
-    }
-
-    private fun sendLocalCommand(command: String, data: Map<String, String> = emptyMap()) {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            action = "com.a8kernrh33.buzzer.REMOTE_COMMAND"
-            putExtra("command", command)
-            data.forEach { (key, value) -> putExtra(key, value) }
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        startActivity(intent)
     }
 
     private fun parsePattern(raw: String): LongArray? {
