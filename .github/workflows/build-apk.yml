@@ -25,7 +25,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
@@ -37,11 +36,14 @@ jobs:
             "platforms;android-36" \
             "build-tools;36.0.0"
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
+      - name: Install Gradle 8.13
+        run: |
+          curl -fsSL -o gradle.zip https://services.gradle.org/distributions/gradle-8.13-bin.zip
+          unzip -q gradle.zip
+          rm gradle.zip
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradle-8.13/bin/gradle assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
