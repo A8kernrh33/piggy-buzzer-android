@@ -14,6 +14,9 @@
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Device Control Center" android:textColor="#FFF7FB" android:textSize="30sp" android:textStyle="bold" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Authorized remote controls. Higher-privilege features require explicit setup on this device." android:textColor="#B7A7B2" android:textSize="14sp" />
 
+        <Button android:id="@+id/setupButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="⚡ QUICK SETUP — Enable permissions" />
+        <TextView android:id="@+id/telemetryView" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:padding="14dp" android:background="#151017" android:text="⚠️ Quick setup: checking..." android:textColor="#FFF7FB" android:textSize="14sp" />
+
         <TextView android:id="@+id/deviceStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:padding="16dp" android:background="#151017" android:text="● DEVICE ONLINE" android:textColor="#6DF2AD" android:textStyle="bold" />
         <TextView android:id="@+id/batteryView" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:padding="16dp" android:background="#151017" android:text="🔋 Battery: checking..." android:textColor="#FFF7FB" android:textSize="15sp" />
 
@@ -27,6 +30,7 @@
         <Button android:id="@+id/deviceAdminButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Enable optional device-lock permission" />
         <Button android:id="@+id/accessibilityButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Open Accessibility settings" />
         <Button android:id="@+id/notificationSettingsButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Open notification settings" />
+        <Button android:id="@+id/vibrateTestButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="📳 Test vibration locally" />
 
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="TRUST LEVELS" android:textColor="#B7A7B2" android:textSize="11sp" android:textStyle="bold" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:padding="15dp" android:background="#151017" android:text="🔔 PUBLIC  ·  Summon + message" android:textColor="#FFF7FB" android:textSize="14sp" />
