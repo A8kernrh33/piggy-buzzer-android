@@ -10,9 +10,9 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🚨 BUZZ!"
+        android:text="🚨 BUZZER 2.0"
         android:textColor="#FFFFFF"
-        android:textSize="52sp"
+        android:textSize="42sp"
         android:textStyle="bold" />
 
     <TextView
@@ -26,9 +26,11 @@
         android:textStyle="bold" />
 
     <TextView
-        android:layout_width="wrap_content"
+        android:id="@+id/messageView"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="14dp"
+        android:gravity="center"
         android:text="needs your attention"
         android:textColor="#FECACA"
         android:textSize="20sp" />
@@ -38,7 +40,7 @@
         android:layout_width="match_parent"
         android:layout_height="80dp"
         android:layout_marginTop="60dp"
-        android:text="STOP ALARM"
-        android:textSize="24sp"
+        android:text="ACKNOWLEDGE / STOP"
+        android:textSize="22sp"
         android:textStyle="bold" />
 </LinearLayout>
