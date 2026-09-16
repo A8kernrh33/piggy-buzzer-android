@@ -23,15 +23,11 @@ class BuzzerMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         val command = data["command"]?.trim()?.lowercase() ?: "summon"
-
         when (command) {
             "stop_alarm" -> stopAlarm()
             "vibrate" -> vibrate(data["vibration_pattern"])
             "stop_vibration" -> getVibrator().cancel()
-            "notification" -> showCustomNotification(
-                data["title"]?.take(80) ?: "BUZZER 2.0",
-                data["message"]?.take(500) ?: "You have a new summon."
-            )
+            "notification" -> showCustomNotification(data["title"]?.take(80) ?: "BUZZER 2.0", data["message"]?.take(500) ?: "You have a new summon.")
             "wake" -> wakeScreen()
             "volume" -> setVolume(data["stream"], data["level"])
             "volume_up" -> adjustVolume(data["stream"], AudioManager.ADJUST_RAISE)
@@ -54,26 +50,24 @@ class BuzzerMessagingService : FirebaseMessagingService() {
                 showAlarmNotification(name, text, duration, volume, pattern)
             }
         }
+        val token = getSharedPreferences("buzzer", MODE_PRIVATE).getString("fcm_token", "") ?: ""
+        DeviceStatusReporter.reportAsync(this, token)
     }
 
     override fun onNewToken(token: String) {
         getSharedPreferences("buzzer", MODE_PRIVATE).edit().putString("fcm_token", token).apply()
+        DeviceStatusReporter.reportAsync(this, token)
     }
 
-    private fun getVibrator(): Vibrator = if (Build.VERSION.SDK_INT >= 31) {
-        getSystemService(VibratorManager::class.java).defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    private fun getVibrator(): Vibrator = if (Build.VERSION.SDK_INT >= 31) getSystemService(VibratorManager::class.java).defaultVibrator else {
+        @Suppress("DEPRECATION") getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
 
     private fun vibrate(raw: String?) {
         val pattern = raw?.let { parsePattern(it) } ?: longArrayOf(0, 600, 250, 600, 250, 1000)
         val vibrator = getVibrator()
-        if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
-        else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(pattern, 0)
+        if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0)) else {
+            @Suppress("DEPRECATION") vibrator.vibrate(pattern, 0)
         }
     }
 
@@ -85,11 +79,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
 
     private fun wakeScreen() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        @Suppress("DEPRECATION")
-        val wakeLock = pm.newWakeLock(
-            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-            "PiggyBuzzer:RemoteWake"
-        )
+        @Suppress("DEPRECATION") val wakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "PiggyBuzzer:RemoteWake")
         wakeLock.acquire(5000L)
     }
 
@@ -102,8 +92,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
     }
 
     private fun adjustVolume(streamRaw: String?, direction: Int) {
-        val audio = getSystemService(AudioManager::class.java)
-        audio.adjustStreamVolume(streamFromName(streamRaw), direction, 0)
+        getSystemService(AudioManager::class.java).adjustStreamVolume(streamFromName(streamRaw), direction, 0)
     }
 
     private fun setMute(streamRaw: String?, mute: Boolean) {
@@ -128,12 +117,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
     }
 
     private fun openApprovedApp(packageName: String?) {
-        val approved = setOf(
-            "com.google.android.youtube",
-            "com.spotify.music",
-            "com.google.android.apps.maps",
-            "com.discord"
-        )
+        val approved = setOf("com.google.android.youtube", "com.spotify.music", "com.google.android.apps.maps", "com.discord")
         val pkg = packageName?.trim() ?: return
         if (pkg !in approved) return
         val launch = packageManager.getLaunchIntentForPackage(pkg) ?: return
@@ -186,14 +170,9 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         val pendingIntent = PendingIntent.getActivity(this, System.currentTimeMillis().toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val content = if (message.isNotBlank()) message else "$name needs your attention"
         val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("SUMMONED BY $name")
-            .setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(false).setOngoing(true).setFullScreenIntent(pendingIntent, true).build()
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("SUMMONED BY $name").setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content)).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setAutoCancel(false).setOngoing(true).setFullScreenIntent(pendingIntent, true).build()
         manager.notify(9001, notification)
     }
 
@@ -201,8 +180,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         val channelId = "buzzer_control"
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) manager.createNotificationChannel(NotificationChannel(channelId, "Buzzer controls", NotificationManager.IMPORTANCE_HIGH))
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(message)
+        val notification = NotificationCompat.Builder(this, channelId).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message)).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).build()
         manager.notify(9002, notification)
     }
