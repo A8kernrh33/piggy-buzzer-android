@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
 import android.provider.Settings
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var tokenView: TextView
     private lateinit var batteryView: TextView
     private lateinit var adminView: TextView
+    private lateinit var telemetryView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,21 +29,21 @@ class MainActivity : ComponentActivity() {
         tokenView = findViewById(R.id.tokenView)
         batteryView = findViewById(R.id.batteryView)
         adminView = findViewById(R.id.adminView)
+        telemetryView = findViewById(R.id.telemetryView)
 
+        findViewById<Button>(R.id.setupButton).setOnClickListener { openQuickSetup() }
         findViewById<Button>(R.id.copyButton).setOnClickListener { copyToken() }
         findViewById<Button>(R.id.testButton).setOnClickListener {
             startActivity(Intent(this, AlarmActivity::class.java).putExtra("name", "Test Buzz"))
         }
+        findViewById<Button>(R.id.vibrateTestButton).setOnClickListener { testVibration() }
         findViewById<Button>(R.id.deviceAdminButton).setOnClickListener { requestDeviceAdmin() }
-        findViewById<Button>(R.id.accessibilityButton).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
-        findViewById<Button>(R.id.notificationSettingsButton).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
-        }
+        findViewById<Button>(R.id.accessibilityButton).setOnClickListener { openAccessibility() }
+        findViewById<Button>(R.id.notificationSettingsButton).setOnClickListener { openNotificationSettings() }
 
         updateBattery()
         updateCapabilityStatus()
+        updateSetupStatus()
         loadToken()
     }
 
@@ -49,6 +51,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         updateBattery()
         updateCapabilityStatus()
+        updateSetupStatus()
         val token = getSharedPreferences("buzzer", MODE_PRIVATE).getString("fcm_token", "") ?: ""
         DeviceStatusReporter.reportAsync(this, token)
     }
@@ -74,12 +77,57 @@ class MainActivity : ComponentActivity() {
         adminView.text = "🔐 Device admin: $adminState"
     }
 
+    private fun updateSetupStatus() {
+        val notificationOk = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            checkSelfPermission("android.permission.POST_NOTIFICATIONS") == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else true
+        val dpm = getSystemService(DevicePolicyManager::class.java)
+        val admin = ComponentName(this, BuzzerDeviceAdminReceiver::class.java)
+        val adminOk = dpm.isAdminActive(admin)
+        val ok = notificationOk && adminOk
+        telemetryView.text = if (ok) "✅ Quick setup: core permissions enabled" else "⚠️ Quick setup: some optional permissions/settings still need attention"
+    }
+
+    private fun openQuickSetup() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 100)
+            return
+        }
+        val dpm = getSystemService(DevicePolicyManager::class.java)
+        val admin = ComponentName(this, BuzzerDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(admin)) {
+            requestDeviceAdmin()
+            return
+        }
+        openNotificationSettings()
+    }
+
+    private fun testVibration() {
+        val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31) {
+            getSystemService(android.os.VibratorManager::class.java).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION") getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+        }
+        val pattern = longArrayOf(0, 500, 200, 500, 200, 800)
+        if (android.os.Build.VERSION.SDK_INT >= 26) vibrator.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1))
+        else {
+            @Suppress("DEPRECATION") vibrator.vibrate(pattern, -1)
+        }
+        telemetryView.text = "📳 Local vibration test sent — if you feel nothing, check the phone's vibration settings."
+    }
+
     private fun requestDeviceAdmin() {
         val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
             putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, ComponentName(this@MainActivity, BuzzerDeviceAdminReceiver::class.java))
             putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Enables the optional Buzzer device-lock control. You choose whether to activate it.")
         }
         startActivity(intent)
+    }
+
+    private fun openAccessibility() = startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+
+    private fun openNotificationSettings() {
+        startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
     }
 
     private fun loadToken() {
