@@ -9,6 +9,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -17,6 +18,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.core.content.ContextCompat
 
 class AlarmActivity : ComponentActivity() {
     private var player: MediaPlayer? = null
@@ -41,7 +43,12 @@ class AlarmActivity : ComponentActivity() {
             if (message.isNotBlank()) "\u201c$message\u201d" else "needs your attention"
         findViewById<Button>(R.id.stopButton).setOnClickListener { stopAlarm() }
 
-        registerReceiver(stopReceiver, IntentFilter("com.a8kernrh33.buzzer.STOP_ALARM"), RECEIVER_NOT_EXPORTED)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(stopReceiver, IntentFilter("com.a8kernrh33.buzzer.STOP_ALARM"), RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(stopReceiver, IntentFilter("com.a8kernrh33.buzzer.STOP_ALARM"))
+        }
         startAlarm()
     }
 
@@ -66,7 +73,7 @@ class AlarmActivity : ComponentActivity() {
             start()
         }
 
-        vibrator = if (android.os.Build.VERSION.SDK_INT >= 31) {
+        vibrator = if (Build.VERSION.SDK_INT >= 31) {
             getSystemService(VibratorManager::class.java).defaultVibrator
         } else {
             @Suppress("DEPRECATION")
@@ -75,7 +82,7 @@ class AlarmActivity : ComponentActivity() {
 
         val pattern = intent.getLongArrayExtra("vibration_pattern")
             ?: longArrayOf(0, 600, 250, 600, 250, 1000)
-        if (android.os.Build.VERSION.SDK_INT >= 26) {
+        if (Build.VERSION.SDK_INT >= 26) {
             vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
         } else {
             @Suppress("DEPRECATION")
