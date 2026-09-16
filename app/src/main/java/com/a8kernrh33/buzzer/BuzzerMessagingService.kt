@@ -24,6 +24,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         val data = message.data
         val command = data["command"]?.trim()?.lowercase() ?: "summon"
         when (command) {
+            "status" -> Unit
             "stop_alarm" -> stopAlarm()
             "vibrate" -> vibrate(data["vibration_pattern"])
             "stop_vibration" -> getVibrator().cancel()
@@ -71,11 +72,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun stopAlarm() {
-        getVibrator().cancel()
-        getSystemService(NotificationManager::class.java).cancel(9001)
-        sendBroadcast(Intent("com.a8kernrh33.buzzer.STOP_ALARM"))
-    }
+    private fun stopAlarm() { getVibrator().cancel(); getSystemService(NotificationManager::class.java).cancel(9001); sendBroadcast(Intent("com.a8kernrh33.buzzer.STOP_ALARM")) }
 
     private fun wakeScreen() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -91,9 +88,7 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         audio.setStreamVolume(stream, level, 0)
     }
 
-    private fun adjustVolume(streamRaw: String?, direction: Int) {
-        getSystemService(AudioManager::class.java).adjustStreamVolume(streamFromName(streamRaw), direction, 0)
-    }
+    private fun adjustVolume(streamRaw: String?, direction: Int) { getSystemService(AudioManager::class.java).adjustStreamVolume(streamFromName(streamRaw), direction, 0) }
 
     private fun setMute(streamRaw: String?, mute: Boolean) {
         val audio = getSystemService(AudioManager::class.java)
@@ -154,25 +149,13 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
-            val channel = NotificationChannel(channelId, "Buzzer alarms", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Alarms sent by authorized Buzzer controls"
-                setSound(alarmSound, attributes)
-                enableVibration(true)
-                vibrationPattern = pattern ?: longArrayOf(0, 500, 300, 500, 300, 800)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-            }
+            val channel = NotificationChannel(channelId, "Buzzer alarms", NotificationManager.IMPORTANCE_HIGH).apply { description = "Alarms sent by authorized Buzzer controls"; setSound(alarmSound, attributes); enableVibration(true); vibrationPattern = pattern ?: longArrayOf(0, 500, 300, 500, 300, 800); lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC }
             manager.createNotificationChannel(channel)
         }
-        val intent = Intent(this, AlarmActivity::class.java).apply {
-            putExtra("name", name); putExtra("message", message); putExtra("duration", duration); putExtra("volume", volume); putExtra("vibration_pattern", pattern)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
+        val intent = Intent(this, AlarmActivity::class.java).apply { putExtra("name", name); putExtra("message", message); putExtra("duration", duration); putExtra("volume", volume); putExtra("vibration_pattern", pattern); flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
         val pendingIntent = PendingIntent.getActivity(this, System.currentTimeMillis().toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val content = if (message.isNotBlank()) message else "$name needs your attention"
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("SUMMONED BY $name").setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(content)).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setAutoCancel(false).setOngoing(true).setFullScreenIntent(pendingIntent, true).build()
+        val notification = NotificationCompat.Builder(this, channelId).setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("SUMMONED BY $name").setContentText(content).setStyle(NotificationCompat.BigTextStyle().bigText(content)).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_ALARM).setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setAutoCancel(false).setOngoing(true).setFullScreenIntent(pendingIntent, true).build()
         manager.notify(9001, notification)
     }
 
@@ -180,17 +163,11 @@ class BuzzerMessagingService : FirebaseMessagingService() {
         val channelId = "buzzer_control"
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) manager.createNotificationChannel(NotificationChannel(channelId, "Buzzer controls", NotificationManager.IMPORTANCE_HIGH))
-        val notification = NotificationCompat.Builder(this, channelId).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message)).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).build()
+        val notification = NotificationCompat.Builder(this, channelId).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(message).setStyle(NotificationCompat.BigTextStyle().bigText(message)).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).build()
         manager.notify(9002, notification)
     }
 
     private fun parsePattern(raw: String): LongArray? = raw.split(",").mapNotNull { it.trim().toLongOrNull() }.take(20).map { it.coerceIn(0, 10000) }.toLongArray().takeIf { it.isNotEmpty() }
 
-    private object KeyEventCodes {
-        const val PLAY_PAUSE = android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-        const val NEXT = android.view.KeyEvent.KEYCODE_MEDIA_NEXT
-        const val PREVIOUS = android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
-        const val STOP = android.view.KeyEvent.KEYCODE_MEDIA_STOP
-    }
+    private object KeyEventCodes { const val PLAY_PAUSE = android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE; const val NEXT = android.view.KeyEvent.KEYCODE_MEDIA_NEXT; const val PREVIOUS = android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS; const val STOP = android.view.KeyEvent.KEYCODE_MEDIA_STOP }
 }
